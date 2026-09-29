@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Doodle Dash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#211a4d;--panel:#2e2570;--line:#4a3fa0;--text:#f7f3ff;--lemon:#ffd23f;--coral:#ff5a5f;--mint:#2ec4b6}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--ink);color:var(--text);font:16px/1.4 'Bricolage Grotesque',system-ui,sans-serif}
+[hidden]{display:none!important}
+h1{font-size:clamp(2.6rem,9vw,4.5rem);margin:0;font-weight:800;letter-spacing:-.03em;transform:rotate(-2deg);color:var(--lemon)}
+h2{margin:0}
+.wrap{max-width:1100px;margin:0 auto;padding:20px}
+.card{background:var(--panel);border:3px solid var(--line);border-radius:16px;padding:20px}
+.center{max-width:440px;margin:6vh auto;display:grid;gap:12px}
+label{display:grid;gap:4px;font-weight:700}
+input,select{font:inherit;padding:10px 12px;border-radius:10px;border:3px solid var(--line);background:#fff;color:#211a4d;width:100%}
+.btn{font:inherit;font-weight:700;padding:10px 16px;border:3px solid #000;border-radius:10px;background:var(--lemon);color:#000;box-shadow:3px 3px 0 #000;cursor:pointer}
+.btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #000}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.alt{background:#fff}
+:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+.game{display:grid;grid-template-columns:190px 1fr 260px;gap:16px;align-items:start}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}
+.word{font-size:1.8rem;font-weight:800;letter-spacing:.15em;white-space:pre-wrap;text-align:center;flex:1}
+.timer{min-width:56px;text-align:right;font-size:1.6rem;font-weight:800}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin-bottom:14px}
+.bar i{display:block;height:100%;background:var(--lemon);width:0}
+.stage{position:relative}
+canvas{width:100%;aspect-ratio:4/3;background:#fff;border:4px solid var(--lemon);border-radius:8px;box-shadow:8px 8px 0 var(--coral);touch-action:none;display:block}
+canvas.can{cursor:crosshair}
+.ov{position:absolute;inset:4px;background:rgba(33,26,77,.93);display:grid;align-content:center;justify-items:center;gap:10px;text-align:center;padding:16px;border-radius:4px}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px;align-items:center}
+.sw{width:30px;height:30px;border-radius:50%;border:3px solid #000;cursor:pointer;padding:0}
+.on{outline:3px solid var(--lemon);outline-offset:2px}
+.plist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.plist li{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--ink);border-radius:10px}
+.plist li.me{border:2px solid var(--lemon)}
+.dot{width:14px;height:14px;border-radius:50%;flex:none}
+.sc{margin-left:auto;font-weight:700}
+.tag{font-size:.75rem;background:var(--mint);color:#000;padding:1px 7px;border-radius:99px}
+.chat{display:grid;grid-template-rows:340px auto;gap:8px}
+.log{overflow:auto;background:var(--ink);border-radius:10px;padding:8px;font-size:.95rem}
+.msg{margin-bottom:4px;word-break:break-word}
+.sys{color:#b9b0ff}.good{color:var(--mint);font-weight:700}.close{color:var(--lemon)}.team{color:#9be7ff}
+.code{font-size:3rem;font-weight:800;letter-spacing:.2em;color:var(--lemon)}
+.place{font-size:1.4rem;font-weight:800}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--coral);color:#000;font-weight:700;padding:10px 16px;border-radius:10px;border:3px solid #000}
+@media(max-width:860px){.game{grid-template-columns:1fr}.main{order:-1}.chat{grid-template-rows:180px auto}.plist{grid-auto-flow:column;overflow:auto}.word{font-size:1.3rem}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<section id="home" class="card center">
+  <h1>Doodle Dash</h1>
+  <p>Draw the word, guess the drawing, beat your friends.</p>
+  <label>Your name <input id="name" maxlength="16" autocomplete="nickname"></label>
+  <button class="btn" id="create">Create a room</button>
+  <label>Room code <input id="joincode" maxlength="4" autocapitalize="characters"></label>
+  <button class="btn alt" id="join">Join room</button>
+</section>
+
+<section id="lobby" class="card center" hidden>
+  <p>Room code</p>
+  <div class="code" id="code"></div>
+  <div class="row"><input id="link" readonly aria-label="Invite link"><button class="btn alt" id="copy" style="flex:none">Copy link</button></div>
+  <ul class="plist" id="lobbyPlayers"></ul>
+  <div id="hostbox" style="display:grid;gap:10px">
+    <div class="row">
+      <label>Rounds <select id="rounds"><option>2</option><option selected>3</option><option>4</option><option>5</option></select></label>
+      <label>Seconds per drawing <select id="dtime"><option>45</option><option>60</option><option selected>80</option><option>100</option><option>120</option></select></label>
+    </div>
+    <button class="btn" id="start">Start game</button>
+  </div>
+  <p id="waitmsg" hidden>Waiting for the host to start the game.</p>
+</section>
+
+<section id="game" hidden>
+  <div class="top"><div id="round"></div><div class="word" id="word"></div><div class="timer" id="time"></div></div>
+  <div class="bar"><i id="bar"></i></div>
+  <div class="game">
+    <ul class="plist" id="gamePlayers"></ul>
+    <div class="main">
+      <div class="stage">
+        <canvas id="cv" width="800" height="600"></canvas>
+        <div class="ov" id="ov" hidden></div>
+      </div>
+      <div class="tools" id="tools" hidden>
+        <span id="sw" class="row" style="gap:6px;flex:none;flex-wrap:wrap"></span>
+        <span id="sz" class="row" style="gap:6px;flex:none"></span>
+        <button class="btn alt" id="undo" style="flex:none">Undo</button>
+        <button class="btn alt" id="clear" style="flex:none">Clear</button>
+      </div>
+    </div>
+    <div class="chat">
+      <div class="log" id="log" aria-live="polite"></div>
+      <form id="chatform" class="row"><input id="chatin" maxlength="100" placeholder="Type your guess" autocomplete="off"><button class="btn" style="flex:none">Send</button></form>
+    </div>
+  </div>
+</section>
+
+<section id="end" class="card center" hidden>
+  <h1>Final scores</h1>
+  <ol class="plist" id="ranking" style="list-style:none"></ol>
+  <button class="btn" id="again">Play again</button>
+  <p id="endwait" hidden>Waiting for the host to start another game.</p>
+</section>
+
+</div>
+<div id="toast" hidden></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const h = (t, a = {}, ...k) => { const e = document.createElement(t); Object.assign(e, a); e.append(...k); return e; };
+const W = 800, H = 600;
+let ws, S = null, ops = [], deadline = 0, log = [];
+const cv = $('cv'), cx = cv.getContext('2d');
+cx.lineCap = cx.lineJoin = 'round';
+
+// ---------- networking ----------
+function go(msg) {
+  if (ws && ws.readyState === 1) return ws.send(JSON.stringify(msg));
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host + '/ws');
+  ws.onopen = () => ws.send(JSON.stringify(msg));
+  ws.onmessage = e => on(JSON.parse(e.data));
+  ws.onclose = () => { if (S) toast('Connection lost. Reload the page to rejoin.'); };
+}
+const send = o => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
+function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 3000); }
+
+function on(m) {
+  switch (m.type) {
+    case 'state': S = m; deadline = Date.now() + m.left; render(); break;
+    case 'chat': addChat(m); break;
+    case 'sync': ops = m.ops; redraw(); break;
+    case 'clear': ops = []; redraw(); break;
+    case 'undo': ops.pop(); redraw(); break;
+    case 'op-start': ops.push(m.op); paintOp(m.op); break;
+    case 'op-pts': { const o = ops[ops.length - 1]; if (!o) break; const n = o.pts.length; o.pts.push(...m.pts); paintOp(o, n); break; }
+    case 'error': toast(m.text); break;
+  }
+}
+
+// ---------- drawing ----------
+const COL = ['#211a4d', '#ff5a5f', '#ff9f1c', '#ffd23f', '#2ec4b6', '#3a86ff', '#7b5cff', '#f78fb3', '#8b5a2b', '#ffffff'];
+const SIZES = [['S', 4], ['M', 10], ['L', 22]];
+let tool = { color: COL[0], size: 10 };
+const canDraw = () => S && S.phase === 'drawing' && S.drawerId === S.you;
+function paintOp(o, from = 0) {
+  cx.strokeStyle = cx.fillStyle = o.color; cx.lineWidth = o.size;
+  const P = o.pts, s = Math.max(0, from - 1);
+  cx.beginPath();
+  if (P.length === 1) { cx.arc(P[0][0] * W, P[0][1] * H, o.size / 2, 0, 7); cx.fill(); return; }
+  cx.moveTo(P[s][0] * W, P[s][1] * H);
+  for (let i = s + 1; i < P.length; i++) cx.lineTo(P[i][0] * W, P[i][1] * H);
+  cx.stroke();
+}
+function redraw() { cx.fillStyle = '#fff'; cx.fillRect(0, 0, W, H); ops.forEach(o => paintOp(o)); }
+const pos = e => { const r = cv.getBoundingClientRect(); return [+((e.clientX - r.left) / r.width).toFixed(4), +((e.clientY - r.top) / r.height).toFixed(4)]; };
+let cur = null, buf = [], timer = 0;
+const flush = () => { timer = 0; if (buf.length) { send({ type: 'op-pts', pts: buf }); buf = []; } };
+cv.onpointerdown = e => {
+  if (!canDraw()) return;
+  cv.setPointerCapture(e.pointerId);
+  cur = { t: 's', color: tool.color, size: tool.size, pts: [pos(e)] };
+  ops.push(cur); paintOp(cur); send({ type: 'op-start', op: cur });
+};
+cv.onpointermove = e => {
+  if (!cur) return;
+  const p = pos(e), n = cur.pts.length;
+  cur.pts.push(p); buf.push(p); paintOp(cur, n);
+  if (!timer) timer = setTimeout(flush, 40);
+};
+cv.onpointerup = cv.onpointercancel = () => { flush(); cur = null; };
+$('undo').onclick = () => { ops.pop(); redraw(); send({ type: 'undo' }); };
+$('clear').onclick = () => { ops = []; redraw(); send({ type: 'clear' }); };
+function markTools() {
+  [...$('sw').children].forEach((b, i) => b.classList.toggle('on', COL[i] === tool.color));
+  [...$('sz').children].forEach((b, i) => b.classList.toggle('on', SIZES[i][1] === tool.size));
+}
+COL.forEach(c => { const b = h('button', { className: 'sw', type: 'button', title: c === '#ffffff' ? 'Eraser' : 'Color ' + c }); b.style.background = c; b.onclick = () => { tool.color = c; markTools(); }; $('sw').append(b); });
+SIZES.forEach(([t, s]) => $('sz').append(h('button', { className: 'btn alt', type: 'button', textContent: t, title: 'Brush size ' + t, onclick: () => { tool.size = s; markTools(); } })));
+markTools(); redraw();
+
+// ---------- ui ----------
+function addChat(m) {
+  const d = h('div', { className: 'msg ' + m.kind });
+  if (m.name) { const b = h('b', {}, m.name + (m.kind === 'team' ? ' (guessers only) ' : ' ')); b.style.color = m.color; d.append(b); }
+  d.append(m.text); $('log').append(d); $('log').scrollTop = 1e9;
+}
+const show = n => ['home', 'lobby', 'game', 'end'].forEach(x => $(x).hidden = x !== n);
+const nameOf = id => (S.players.find(p => p.id === id) || { name: 'Someone' }).name;
+function players(el, sorted) {
+  const list = sorted ? [...S.players].sort((a, b) => b.score - a.score) : S.players;
+  el.replaceChildren(...list.map(p => {
+    const li = h('li', { className: p.id === S.you ? 'me' : '' });
+    const dot = h('span', { className: 'dot' }); dot.style.background = p.color;
+    li.append(dot, p.name);
+    if (p.id === S.hostId) li.append(h('span', { className: 'tag', textContent: 'host' }));
+    if (p.id === S.drawerId) li.append(h('span', { className: 'tag', textContent: 'drawing' }));
+    else if (p.guessed) li.append(h('span', { className: 'tag', textContent: 'guessed' }));
+    li.append(h('span', { className: 'sc', textContent: p.score }));
+    return li;
+  }));
+}
+function render() {
+  const s = S, host = s.hostId === s.you, drawer = s.drawerId === s.you;
+  if (s.phase === 'lobby') {
+    show('lobby'); $('code').textContent = s.code; $('link').value = location.origin + '/?room=' + s.code;
+    players($('lobbyPlayers')); $('hostbox').hidden = !host; $('waitmsg').hidden = host;
+    $('start').disabled = s.players.length < 2; $('start').textContent = s.players.length < 2 ? 'Waiting for another player' : 'Start game';
+  } else if (s.phase === 'gameEnd') {
+    show('end');
+    $('ranking').replaceChildren(...[...s.players].sort((a, b) => b.score - a.score).map((p, i) => {
+      const li = h('li', { className: i === 0 ? 'place' : '' }, `${i + 1}. ${p.name}`); li.append(h('span', { className: 'sc', textContent: p.score })); return li;
+    }));
+    $('again').hidden = !host; $('endwait').hidden = host;
+  } else {
+    show('game'); players($('gamePlayers'), true);
+    $('round').textContent = `Round ${s.round} of ${s.settings.rounds}`;
+    const shown = s.phase === 'choosing' ? '' : (s.word || s.mask);
+    $('word').textContent = shown.split('').join(' ');
+    $('tools').hidden = !(drawer && s.phase === 'drawing');
+    cv.className = canDraw() ? 'can' : '';
+    $('chatin').placeholder = drawer ? 'Chat with guessers' : 'Type your guess';
+    const ov = $('ov'); ov.replaceChildren(); ov.hidden = false;
+    if (s.phase === 'choosing') {
+      if (drawer) ov.append(h('p', {}, 'Pick a word to draw'), ...s.choices.map((w, i) => h('button', { className: 'btn', onclick: () => send({ type: 'pick', i }) }, w)));
+      else ov.append(h('p', {}, `${nameOf(s.drawerId)} is choosing a word`));
+    } else if (s.phase === 'turnEnd') {
+      ov.append(h('p', {}, 'The word was'), h('h2', {}, s.word));
+      const g = (s.last && s.last.gains) || {};
+      s.players.filter(p => g[p.id]).forEach(p => ov.append(h('div', {}, `${p.name} +${g[p.id]}`)));
+    } else ov.hidden = true;
+  }
+}
+setInterval(() => {
+  if (!S || !S.total) { $('time').textContent = ''; $('bar').style.width = '0'; return; }
+  const l = Math.max(0, deadline - Date.now());
+  $('time').textContent = Math.ceil(l / 1000); $('bar').style.width = (100 * l / S.total) + '%';
+}, 200);
+
+// ---------- events ----------
+try { $('name').value = localStorage.getItem('dd-name') || ''; } catch {}
+const q = new URLSearchParams(location.search).get('room'); if (q) $('joincode').value = q.slice(0, 4).toUpperCase();
+const nm = () => { const v = $('name').value.trim(); if (!v) { toast('Enter a name first'); $('name').focus(); return null; } try { localStorage.setItem('dd-name', v); } catch {} return v; };
+$('create').onclick = () => { const name = nm(); if (name) go({ type: 'create', name }); };
+$('join').onclick = () => { const name = nm(); if (name) go({ type: 'join', name, code: $('joincode').value }); };
+$('start').onclick = () => send({ type: 'start', rounds: +$('rounds').value, drawTime: +$('dtime').value });
+$('again').onclick = () => send({ type: 'start', rounds: S.settings.rounds, drawTime: S.settings.drawTime });
+$('copy').onclick = () => { $('link').select(); navigator.clipboard && navigator.clipboard.writeText($('link').value); toast('Link copied'); };
+$('chatform').onsubmit = e => { e.preventDefault(); const t = $('chatin').value.trim(); if (t) send({ type: 'chat', text: t }); $('chatin').value = ''; };
+</script>
+</body>
+</html>
